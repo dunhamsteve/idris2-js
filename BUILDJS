@@ -1,0 +1,26 @@
+#!/bin/bash -e
+if [ ! -f PATCHED ]; then
+  patch -d Idris2 -p 1 < Node.patch
+  touch PATCHED
+fi
+# export IDRIS2_PREFIX=~/.idris2-js
+export PREFIX=~/.idris2-js
+export SCHEME=scheme
+PATH=${PREFIX}/bin:$PATH
+rm -rf ${PREFIX}
+# build a scheme Idris
+make -C Idris2 distclean
+make -C Idris2 bootstrap
+make -C Idris2 install 
+# use it to bootstrap a node one
+# make -C Idris2 clean
+make -C Idris2 IDRIS2_CG=node
+make -C Idris2 IDRIS2_CG=node install
+perl -pi -e "s|'.*/.idris2-js'|process.env.HOME + '/.idris2-js'|" ~/.idris2-js/bin/idris2
+# remove scheme idris and arch-specific files
+rm -rf ~/.idris2-js/bin/idris2_app ~/.idris2-js/idris2-0.7.0/lib
+(cd ~/.idris2-js && find . -name \*.so -exec rm {} \;)
+(cd ~/.idris2-js && find . -name \*.a -exec rm {} \;)
+(cd ~/.idris2-js && rm -rf idris2-0.7.0/*/2023*)
+# build release artifact
+DEST=$PWD/idris2-js.zip && (cd ~ && zip -r $DEST .idris2-js)

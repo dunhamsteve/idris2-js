@@ -1,0 +1,58 @@
+name: Build and Install Idris2
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Perl
+        run: |
+          sudo apt-get install -y perl
+          sudo apt-get install -y chezscheme
+
+      - name: checkout Idris2
+        run: git submodule update --init Idris2
+
+      - name: Execute BUILDJS script
+        run: |
+          chmod +x BUILDJS
+          ./BUILDJS
+
+      - name: Get Idris2 submodule SHA
+        id: get_submodule_sha
+        run: |
+          idris2_sha=$(cd Idris2 && git rev-parse --short HEAD)
+          echo "::set-output name=idris2_sha::$idris2_sha"
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_submodule_sha.outputs.idris2_sha }}
+          release_name: Release ${{ steps.get_submodule_sha.outputs.idris2_sha }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./idris2-js.zip
+          asset_name: idris2-js.zip
+          asset_content_type: application/zip

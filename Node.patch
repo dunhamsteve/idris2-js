@@ -1,0 +1,126 @@
+diff --git a/libs/base/System/Errno.idr b/libs/base/System/Errno.idr
+index decddb1cd..c79864dc1 100644
+--- a/libs/base/System/Errno.idr
++++ b/libs/base/System/Errno.idr
+@@ -4,6 +4,7 @@ module System.Errno
+ %default total
+ 
+ %foreign "C:idris2_getErrno, libidris2_support, idris_support.h"
++         "node:support:fileErrno,support_system_file"
+ prim__getErrno : PrimIO Int
+ 
+ %foreign "C:idris2_strerror, libidris2_support, idris_support.h"
+diff --git a/libs/base/System/File/Process.idr b/libs/base/System/File/Process.idr
+index 83dfe3e1b..6d8d0573f 100644
+--- a/libs/base/System/File/Process.idr
++++ b/libs/base/System/File/Process.idr
+@@ -8,6 +8,7 @@ import System.File.Support
+ import public System.File.Types
+ 
+ %foreign "C:fflush,libc 6"
++         "node:lambda:()=>0"
+ prim__flush : FilePtr -> PrimIO Int
+ %foreign supportC "idris2_popen"
+          supportNode "popen"
+diff --git a/libs/base/System/Term.idr b/libs/base/System/Term.idr
+index 0c0a50605..c055a65cc 100644
+--- a/libs/base/System/Term.idr
++++ b/libs/base/System/Term.idr
+@@ -6,12 +6,15 @@ libterm : String -> String
+ libterm s = "C:" ++ s ++ ", libidris2_support, idris_term.h"
+ 
+ %foreign libterm "idris2_setupTerm"
++         "node:lambda:()=>undefined"
+ prim__setupTerm : PrimIO ()
+ 
+ %foreign libterm "idris2_getTermCols"
++         "node:lambda:()=>process.stdout.columns"
+ prim__getTermCols : PrimIO Int
+ 
+ %foreign libterm "idris2_getTermLines"
++         "node:lambda:()=>process.stdout.rows"
+ prim__getTermLines : PrimIO Int
+ 
+ export
+diff --git a/src/Core/Options.idr b/src/Core/Options.idr
+index 542642ba6..4829ee13d 100644
+--- a/src/Core/Options.idr
++++ b/src/Core/Options.idr
+@@ -226,7 +226,7 @@ defaultPPrint = MkPPOpts False False True False
+ 
+ export
+ defaultSession : Session
+-defaultSession = MkSessionOpts False CoveringOnly False False Chez [] 1000 False False
++defaultSession = MkSessionOpts False CoveringOnly False False Node [] 1000 False False
+                                defaultLogLevel Nothing False Nothing Nothing
+                                Nothing Nothing False 1 False False True
+                                False [] False False
+diff --git a/src/Idris/Driver.idr b/src/Idris/Driver.idr
+index 972304b3c..ec310e8bd 100644
+--- a/src/Idris/Driver.idr
++++ b/src/Idris/Driver.idr
+@@ -215,23 +215,7 @@ stMain cgs opts
+ 
+                  doRepl <- catch (postOptions result opts)
+                                  (\err => emitError err *> pure False)
+-                 if doRepl then
+-                   if ide || ideSocket then
+-                     if not ideSocket
+-                      then do
+-                       setOutput (IDEMode 0 stdin stdout)
+-                       replIDE {c} {u} {m}
+-                     else do
+-                       let (host, port) = ideSocketModeAddress opts
+-                       f <- coreLift $ initIDESocketFile host port
+-                       case f of
+-                         Left err => do
+-                           coreLift $ putStrLn err
+-                           coreLift $ exitWith (ExitFailure 1)
+-                         Right file => do
+-                           setOutput (IDEMode 0 file file)
+-                           replIDE {c} {u} {m}
+-                   else do
++                 if doRepl then do
+                        repl {c} {u} {m}
+                        showTimeRecord
+                   else
+diff --git a/src/Idris/REPL.idr b/src/Idris/REPL.idr
+index 1234cda89..8858fe7ad 100644
+--- a/src/Idris/REPL.idr
++++ b/src/Idris/REPL.idr
+@@ -22,8 +22,6 @@ import Core.Termination
+ import Core.Unify
+ import Core.Value
+ 
+-import Core.SchemeEval
+-
+ import Parser.Unlit
+ 
+ import Idris.CommandLine
+@@ -890,13 +888,6 @@ process (Eval itm)
+          let emode = evalMode opts
+          case emode of
+             Execute => do ignore (execExp itm); pure (Executed itm)
+-            Scheme =>
+-              do (tm `WithType` ty) <- inferAndElab InExpr itm []
+-                 qtm <- logTimeWhen !getEvalTiming 0 "Evaluation" $
+-                           (do nf <- snfAll [] tm
+-                               quote [] nf)
+-                 itm <- logTimeWhen False 0 "Resugar" $ resugar [] qtm
+-                 pure (Evaluated itm Nothing)
+             _ =>
+               do (ntm `WithType` ty) <- logTimeWhen !getEvalTiming 0 "Evaluation" $
+                                            inferAndNormalize emode itm
+diff --git a/support/js/support_system_directory.js b/support/js/support_system_directory.js
+index 225eab5a1..1b757efed 100644
+--- a/support/js/support_system_directory.js
++++ b/support/js/support_system_directory.js
+@@ -52,6 +52,8 @@ function support_system_directory_dirEntry(d) {
+   try{
+     const dir = d.readSync()
+     if (dir == null) {
++      // to distinguish between an error and end of stream
++      process.__lasterr = undefined
+       return null
+     } else {
+       return dir.name
