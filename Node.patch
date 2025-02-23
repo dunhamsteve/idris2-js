@@ -112,10 +112,19 @@ index 1234cda89..8858fe7ad 100644
                do (ntm `WithType` ty) <- logTimeWhen !getEvalTiming 0 "Evaluation" $
                                             inferAndNormalize emode itm
 diff --git a/support/js/support_system_directory.js b/support/js/support_system_directory.js
-index 225eab5a1..1b757efed 100644
+index 225eab5a1..5ac5c7a59 100644
 --- a/support/js/support_system_directory.js
 +++ b/support/js/support_system_directory.js
-@@ -52,6 +52,8 @@ function support_system_directory_dirEntry(d) {
+@@ -32,6 +32,8 @@ function support_system_directory_removeDir(d){
+ 
+ function support_system_directory_openDir(d) {
+   try{
++    // bun #17581 workaround
++    support_system_directory_fs.statSync(d)
+     return support_system_directory_fs.opendirSync(d)
+   }catch(e){
+     process.__lasterr = e
+@@ -52,6 +54,8 @@ function support_system_directory_dirEntry(d) {
    try{
      const dir = d.readSync()
      if (dir == null) {

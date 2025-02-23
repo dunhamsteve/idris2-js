@@ -36,23 +36,30 @@ jobs:
           idris2_sha=$(cd Idris2 && git rev-parse --short HEAD)
           echo "::set-output name=idris2_sha::$idris2_sha"
       
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags')
         with:
-          tag_name: ${{ steps.get_submodule_sha.outputs.idris2_sha }}
-          release_name: Release ${{ steps.get_submodule_sha.outputs.idris2_sha }}
-          draft: false
-          prerelease: false
+          files: |
+            idris2-js.zip
+      
+      # - name: Create Release
+      #   id: create_release
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: ${{ steps.get_submodule_sha.outputs.idris2_sha }}
+      #     release_name: Release ${{ steps.get_submodule_sha.outputs.idris2_sha }}
+      #     draft: false
+      #     prerelease: false
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./idris2-js.zip
-          asset_name: idris2-js.zip
-          asset_content_type: application/zip
+      # - name: Upload Release Asset
+      #   uses: actions/upload-release-asset@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
+      #     asset_path: ./idris2-js.zip
+      #     asset_name: idris2-js.zip
+      #     asset_content_type: application/zip
