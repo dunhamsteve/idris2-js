@@ -1,3 +1,23 @@
+diff --git a/libs/base/Data/Either.idr b/libs/base/Data/Either.idr
+index ae1f78260..19fe48975 100644
+--- a/libs/base/Data/Either.idr
++++ b/libs/base/Data/Either.idr
+@@ -95,9 +95,12 @@ lefts (Right _ :: xs) = lefts xs
+ ||| Keep the payloads of all Right constructors in a list of Eithers
+ public export
+ rights : List (Either a b) -> List b
+-rights []              = []
+-rights (Left  _ :: xs) = rights xs
+-rights (Right r :: xs) = r :: rights xs
++rights xs = go xs []
++  where
++    go : List (Either a b) -> List b -> List b
++    go [] acc = reverse acc
++    go (Left _ :: xs) acc = go xs acc
++    go (Right r :: xs) acc = go xs (r :: acc)
+ 
+ ||| Split a list of Eithers into a list of the left elements and a list of the right elements
+ public export
 diff --git a/libs/base/System/Errno.idr b/libs/base/System/Errno.idr
 index decddb1cd..c79864dc1 100644
 --- a/libs/base/System/Errno.idr
@@ -111,6 +131,58 @@ index 1234cda89..8858fe7ad 100644
              _ =>
                do (ntm `WithType` ty) <- logTimeWhen !getEvalTiming 0 "Evaluation" $
                                             inferAndNormalize emode itm
+diff --git a/src/Libraries/Data/IOArray.idr b/src/Libraries/Data/IOArray.idr
+index e85d7797a..2d06da3c8 100644
+--- a/src/Libraries/Data/IOArray.idr
++++ b/src/Libraries/Data/IOArray.idr
+@@ -33,6 +33,11 @@ readArray arr pos
+          then pure Nothing
+          else primIO (prim__arrayGet (content arr) pos)
+ 
++-- I'll need this for chez to run CI
++%foreign "javascript:lambda:(ty,a,b,n) => { for (let i = 0; i <= n; i++) b[i] = a[i] }"
++         "scheme:blodwen-ioarray-copyfrom"
++prim__copyFrom : ArrayData a -> ArrayData a -> Int -> PrimIO ()
++
+ -- Make a new array of the given size with the elements copied from the
+ -- other array
+ export
+@@ -48,11 +53,12 @@ newArrayCopy newsize arr
+                ArrayData (Maybe a) ->
+                Int -> io ()
+     copyFrom old new pos
+-        = if pos < 0
+-             then pure ()
+-             else do el <- primIO $ prim__arrayGet old pos
+-                     primIO $ prim__arraySet new pos el
+-                     copyFrom old new $ assert_smaller pos (pos - 1)
++      = liftIO $ fromPrim $ prim__copyFrom old new pos
++        -- = if pos < 0
++        --      then pure ()
++        --      else do el <- primIO $ prim__arrayGet old pos
++        --              primIO $ prim__arraySet new pos el
++        --              copyFrom old new $ assert_smaller pos (pos - 1)
+ 
+ export
+ toList : HasIO io => IOArray a -> io (List (Maybe a))
+diff --git a/support/chez/support.ss b/support/chez/support.ss
+index ffb37d4ee..32f2ec1ad 100644
+--- a/support/chez/support.ss
++++ b/support/chez/support.ss
+@@ -562,6 +562,13 @@
+ (define (blodwen-hasenv var)
+   (if (eq? (getenv var) #f) 0 1))
+ 
++;; IOArray
++(define (blodwen-ioarray-copyfrom ty src dst end)
++  (let loop [(i 0)]
++    (when (<= i end)
++      (vector-set! dst i (vector-ref src i))
++      (loop (+ i 1)))))
++
+ ;; Randoms
+ (define random-seed-register 0)
+ (define (initialize-random-seed-once)
 diff --git a/support/js/support_system_directory.js b/support/js/support_system_directory.js
 index 225eab5a1..5ac5c7a59 100644
 --- a/support/js/support_system_directory.js
