@@ -62,6 +62,75 @@ index 0c0a50605..c055a65cc 100644
  prim__getTermLines : PrimIO Int
  
  export
+diff --git a/src/Compiler/Common.idr b/src/Compiler/Common.idr
+index d51b416f0..28fcaa525 100644
+--- a/src/Compiler/Common.idr
++++ b/src/Compiler/Common.idr
+@@ -169,28 +169,29 @@ getAllDesc : {auto c : Ref Ctxt Defs} ->
+                             -- the full definition later.
+                             -- (We only need to decode the case tree IR, and
+                             -- it's expensive to decode the whole thing)
+-             Defs -> Core ()
+-getAllDesc [] arr defs = pure ()
++             Defs -> IO (Either Error ()) -- We need to work in IO to get TCO to do its thing
++getAllDesc [] arr defs = pure $ pure ()
+ getAllDesc (n@(Resolved i) :: rest) arr defs
+-  = do Nothing <- coreLift $ readArray arr i
++  = do Nothing <- readArray arr i
+            | Just _ => getAllDesc rest arr defs
+-       case !(lookupContextEntry n (gamma defs)) of
+-            Nothing => do log "compile.execute" 20 $ "Couldn't find " ++ show n
+-                          getAllDesc rest arr defs
+-            Just (_, entry) =>
+-              do (def, bin) <- getMinimalDef entry
+-                 ignore $ addDef n def
++       case !(runCore $ lookupContextEntry n (gamma defs)) of
++            Left err => pure $ Left err
++            Right Nothing => do ignore $ runCore $ log "compile.execute" 20 $ "Couldn't find " ++ show n
++                                getAllDesc rest arr defs
++            Right (Just (_, entry)) =>
++              do Right (def, bin) <- runCore $ getMinimalDef entry | Left err => pure $ Left err
++                 Right _ <- runCore $ addDef n def  | Left err => pure $ Left err
+                  let refs = refersToRuntime def
+                  if multiplicity def /= erased
+-                    then do coreLift $ writeArray arr i (i, bin)
++                    then do writeArray arr i (i, bin)
+                             let refs = refersToRuntime def
+-                            refs' <- traverse toResolvedNames (keys refs)
++                            Right refs' <- runCore $ traverse toResolvedNames (keys refs) | Left err => pure $ Left err
+                             getAllDesc (refs' ++ rest) arr defs
+-                    else do log "compile.execute" 20
++                    else do ignore $ runCore $ log "compile.execute" 20
+                                $ "Dropping " ++ show n ++ " because it's erased"
+                             getAllDesc rest arr defs
+ getAllDesc (n :: rest) arr defs
+-  = do log "compile.execute" 20 $
++  = do ignore $ runCore $ log "compile.execute" 20 $
+          "Ignoring " ++ show n ++ " because it's not a Resolved name"
+        getAllDesc rest arr defs
+ 
+@@ -319,7 +320,7 @@ getCompileDataWith exports doLazyAnnots phase_in tm_in
+          arr <- coreLift $ newArray asize
+ 
+          defs <- get Ctxt
+-         logTime 2 "Get names" $ getAllDesc (natHackNames' ++ ns) arr defs
++         logTime 2 "Get names" $ MkCore $ getAllDesc (natHackNames' ++ ns) arr defs
+ 
+          let entries = catMaybes !(coreLift (toList arr))
+          let allNs = map (Resolved . fst) entries
+diff --git a/src/Core/Core.idr b/src/Core/Core.idr
+index 8658f819d..9a233b75c 100644
+--- a/src/Core/Core.idr
++++ b/src/Core/Core.idr
+@@ -593,7 +593,7 @@ killErrorLoc (OperatorBindingMismatch {print} fc expected actual opName rhs cand
+ 
+ 
+ -- Core is a wrapper around IO that is specialised for efficiency.
+-export
++public export
+ record Core t where
+   constructor MkCore
+   runCore : IO (Either Error t)
 diff --git a/src/Core/Options.idr b/src/Core/Options.idr
 index 542642ba6..4829ee13d 100644
 --- a/src/Core/Options.idr
