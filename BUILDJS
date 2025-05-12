@@ -19,8 +19,20 @@ make -C Idris2 IDRIS2_CG=node install
 perl -pi -e "s|'.*/.idris2-js'|process.env.HOME + '/.idris2-js'|" ~/.idris2-js/bin/idris2
 # remove scheme idris and arch-specific files
 rm -rf ~/.idris2-js/bin/idris2_app ~/.idris2-js/idris2-0.7.0/lib
-(cd ~/.idris2-js && find . -name \*.so -exec rm {} \;)
-(cd ~/.idris2-js && find . -name \*.a -exec rm {} \;)
-(cd ~/.idris2-js && rm -rf idris2-0.7.0/*/2023*)
+(
+  cd ~/.idris2-js
+  mv bin/idris2 bin/idris2.js
+  cat <<EOF > bin/idris2
+#!/bin/sh
+exec node --stack-size=8000 ~/.idris2-js/bin/idris2.js "\$@"
+EOF
+  chmod +x bin/idris2
+  find . -name \*.so -exec rm {} \;
+  find . -name \*.a -exec rm {} \;
+  rm -rf idris2-0.7.0/*/2023*
+)
+# (cd ~/.idris2-js && find . -name \*.so -exec rm {} \;)
+# (cd ~/.idris2-js && find . -name \*.a -exec rm {} \;)
+# (cd ~/.idris2-js && rm -rf idris2-0.7.0/*/2023*)
 # build release artifact
 DEST=$PWD/idris2-js.zip && (cd ~ && zip -r $DEST .idris2-js)
