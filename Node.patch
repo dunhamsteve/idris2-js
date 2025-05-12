@@ -1,8 +1,8 @@
 diff --git a/libs/base/Data/Either.idr b/libs/base/Data/Either.idr
-index ae1f78260..19fe48975 100644
+index 05136fceb..b202dbafc 100644
 --- a/libs/base/Data/Either.idr
 +++ b/libs/base/Data/Either.idr
-@@ -95,9 +95,12 @@ lefts (Right _ :: xs) = lefts xs
+@@ -97,9 +97,12 @@ lefts (Right _ :: xs) = lefts xs
  ||| Keep the payloads of all Right constructors in a list of Eithers
  public export
  rights : List (Either a b) -> List b
@@ -18,50 +18,6 @@ index ae1f78260..19fe48975 100644
  
  ||| Split a list of Eithers into a list of the left elements and a list of the right elements
  public export
-diff --git a/libs/base/System/Errno.idr b/libs/base/System/Errno.idr
-index decddb1cd..c79864dc1 100644
---- a/libs/base/System/Errno.idr
-+++ b/libs/base/System/Errno.idr
-@@ -4,6 +4,7 @@ module System.Errno
- %default total
- 
- %foreign "C:idris2_getErrno, libidris2_support, idris_support.h"
-+         "node:support:fileErrno,support_system_file"
- prim__getErrno : PrimIO Int
- 
- %foreign "C:idris2_strerror, libidris2_support, idris_support.h"
-diff --git a/libs/base/System/File/Process.idr b/libs/base/System/File/Process.idr
-index 83dfe3e1b..6d8d0573f 100644
---- a/libs/base/System/File/Process.idr
-+++ b/libs/base/System/File/Process.idr
-@@ -8,6 +8,7 @@ import System.File.Support
- import public System.File.Types
- 
- %foreign "C:fflush,libc 6"
-+         "node:lambda:()=>0"
- prim__flush : FilePtr -> PrimIO Int
- %foreign supportC "idris2_popen"
-          supportNode "popen"
-diff --git a/libs/base/System/Term.idr b/libs/base/System/Term.idr
-index 0c0a50605..c055a65cc 100644
---- a/libs/base/System/Term.idr
-+++ b/libs/base/System/Term.idr
-@@ -6,12 +6,15 @@ libterm : String -> String
- libterm s = "C:" ++ s ++ ", libidris2_support, idris_term.h"
- 
- %foreign libterm "idris2_setupTerm"
-+         "node:lambda:()=>undefined"
- prim__setupTerm : PrimIO ()
- 
- %foreign libterm "idris2_getTermCols"
-+         "node:lambda:()=>process.stdout.columns"
- prim__getTermCols : PrimIO Int
- 
- %foreign libterm "idris2_getTermLines"
-+         "node:lambda:()=>process.stdout.rows"
- prim__getTermLines : PrimIO Int
- 
- export
 diff --git a/src/Compiler/Common.idr b/src/Compiler/Common.idr
 index d51b416f0..28fcaa525 100644
 --- a/src/Compiler/Common.idr
@@ -119,7 +75,7 @@ index d51b416f0..28fcaa525 100644
           let entries = catMaybes !(coreLift (toList arr))
           let allNs = map (Resolved . fst) entries
 diff --git a/src/Core/Core.idr b/src/Core/Core.idr
-index 8658f819d..9a233b75c 100644
+index bfa34f52e..11a5b732c 100644
 --- a/src/Core/Core.idr
 +++ b/src/Core/Core.idr
 @@ -593,7 +593,7 @@ killErrorLoc (OperatorBindingMismatch {print} fc expected actual opName rhs cand
@@ -145,36 +101,36 @@ index 542642ba6..4829ee13d 100644
                                 Nothing Nothing False 1 False False True
                                 False [] False False
 diff --git a/src/Idris/Driver.idr b/src/Idris/Driver.idr
-index 972304b3c..ec310e8bd 100644
+index 1725eb981..6dcf88ce4 100644
 --- a/src/Idris/Driver.idr
 +++ b/src/Idris/Driver.idr
-@@ -215,23 +215,7 @@ stMain cgs opts
+@@ -206,23 +206,7 @@ stMain cgs opts
  
-                  doRepl <- catch (postOptions result opts)
-                                  (\err => emitError err *> pure False)
--                 if doRepl then
--                   if ide || ideSocket then
--                     if not ideSocket
--                      then do
--                       setOutput (IDEMode 0 stdin stdout)
--                       replIDE {c} {u} {m}
--                     else do
--                       let (host, port) = ideSocketModeAddress opts
--                       f <- coreLift $ initIDESocketFile host port
--                       case f of
--                         Left err => do
--                           coreLift $ putStrLn err
--                           coreLift $ exitWith (ExitFailure 1)
--                         Right file => do
--                           setOutput (IDEMode 0 file file)
--                           replIDE {c} {u} {m}
+                doRepl <- catch (postOptions result opts)
+                                (\err => emitError err *> pure False)
+-               if doRepl then
+-                 if ide || ideSocket then
+-                   if not ideSocket
+-                    then do
+-                     setOutput (IDEMode 0 stdin stdout)
+-                     replIDE {c} {u} {m}
 -                   else do
-+                 if doRepl then do
-                        repl {c} {u} {m}
-                        showTimeRecord
-                   else
+-                     let (host, port) = ideSocketModeAddress opts
+-                     f <- coreLift $ initIDESocketFile host port
+-                     case f of
+-                       Left err => do
+-                         coreLift $ putStrLn err
+-                         coreLift $ exitWith (ExitFailure 1)
+-                       Right file => do
+-                         setOutput (IDEMode 0 file file)
+-                         replIDE {c} {u} {m}
+-                 else do
++               if doRepl then do
+                      repl {c} {u} {m}
+                      showTimeRecord
+                 else
 diff --git a/src/Idris/REPL.idr b/src/Idris/REPL.idr
-index 1234cda89..8858fe7ad 100644
+index dda9f6b96..ea10489bc 100644
 --- a/src/Idris/REPL.idr
 +++ b/src/Idris/REPL.idr
 @@ -22,8 +22,6 @@ import Core.Termination
@@ -253,7 +209,7 @@ index ffb37d4ee..32f2ec1ad 100644
  (define random-seed-register 0)
  (define (initialize-random-seed-once)
 diff --git a/support/js/support_system_directory.js b/support/js/support_system_directory.js
-index 225eab5a1..5ac5c7a59 100644
+index 1b757efed..5ac5c7a59 100644
 --- a/support/js/support_system_directory.js
 +++ b/support/js/support_system_directory.js
 @@ -32,6 +32,8 @@ function support_system_directory_removeDir(d){
@@ -265,12 +221,3 @@ index 225eab5a1..5ac5c7a59 100644
      return support_system_directory_fs.opendirSync(d)
    }catch(e){
      process.__lasterr = e
-@@ -52,6 +54,8 @@ function support_system_directory_dirEntry(d) {
-   try{
-     const dir = d.readSync()
-     if (dir == null) {
-+      // to distinguish between an error and end of stream
-+      process.__lasterr = undefined
-       return null
-     } else {
-       return dir.name
