@@ -19,10 +19,10 @@ index 05136fceb..b202dbafc 100644
  ||| Split a list of Eithers into a list of the left elements and a list of the right elements
  public export
 diff --git a/src/Compiler/Common.idr b/src/Compiler/Common.idr
-index d51b416f0..28fcaa525 100644
+index 3372b16d4..dc7854d2e 100644
 --- a/src/Compiler/Common.idr
 +++ b/src/Compiler/Common.idr
-@@ -169,28 +169,29 @@ getAllDesc : {auto c : Ref Ctxt Defs} ->
+@@ -170,28 +170,29 @@ getAllDesc : {auto c : Ref Ctxt Defs} ->
                              -- the full definition later.
                              -- (We only need to decode the case tree IR, and
                              -- it's expensive to decode the whole thing)
@@ -65,7 +65,7 @@ index d51b416f0..28fcaa525 100644
           "Ignoring " ++ show n ++ " because it's not a Resolved name"
         getAllDesc rest arr defs
  
-@@ -319,7 +320,7 @@ getCompileDataWith exports doLazyAnnots phase_in tm_in
+@@ -320,7 +321,7 @@ getCompileDataWith exports doLazyAnnots phase_in tm_in
           arr <- coreLift $ newArray asize
  
           defs <- get Ctxt
@@ -75,10 +75,10 @@ index d51b416f0..28fcaa525 100644
           let entries = catMaybes !(coreLift (toList arr))
           let allNs = map (Resolved . fst) entries
 diff --git a/src/Core/Core.idr b/src/Core/Core.idr
-index bfa34f52e..11a5b732c 100644
+index 7cd9924e6..30977f095 100644
 --- a/src/Core/Core.idr
 +++ b/src/Core/Core.idr
-@@ -593,7 +593,7 @@ killErrorLoc (OperatorBindingMismatch {print} fc expected actual opName rhs cand
+@@ -600,7 +600,7 @@ killErrorLoc (OperatorBindingMismatch {print} fc expected actual opName rhs cand
  
  
  -- Core is a wrapper around IO that is specialised for efficiency.
@@ -101,7 +101,7 @@ index 542642ba6..4829ee13d 100644
                                 Nothing Nothing False 1 False False True
                                 False [] False False
 diff --git a/src/Idris/Driver.idr b/src/Idris/Driver.idr
-index 1725eb981..6dcf88ce4 100644
+index 0a4f4cf63..a1f4169ee 100644
 --- a/src/Idris/Driver.idr
 +++ b/src/Idris/Driver.idr
 @@ -206,23 +206,7 @@ stMain cgs opts
@@ -130,7 +130,7 @@ index 1725eb981..6dcf88ce4 100644
                       showTimeRecord
                  else
 diff --git a/src/Idris/REPL.idr b/src/Idris/REPL.idr
-index dda9f6b96..ea10489bc 100644
+index 4a929787d..bcf9d148f 100644
 --- a/src/Idris/REPL.idr
 +++ b/src/Idris/REPL.idr
 @@ -22,8 +22,6 @@ import Core.Termination
@@ -142,16 +142,16 @@ index dda9f6b96..ea10489bc 100644
  import Parser.Unlit
  
  import Idris.CommandLine
-@@ -890,13 +888,6 @@ process (Eval itm)
+@@ -894,13 +892,6 @@ process (Eval itm)
           let emode = evalMode opts
           case emode of
              Execute => do ignore (execExp itm); pure (Executed itm)
 -            Scheme =>
--              do (tm `WithType` ty) <- inferAndElab InExpr itm []
+-              do (tm `WithType` ty) <- inferAndElab InExpr itm Env.empty
 -                 qtm <- logTimeWhen !getEvalTiming 0 "Evaluation" $
--                           (do nf <- snfAll [] tm
--                               quote [] nf)
--                 itm <- logTimeWhen False 0 "Resugar" $ resugar [] qtm
+-                           (do nf <- snfAll Env.empty tm
+-                               quote Env.empty nf)
+-                 itm <- logTimeWhen False 0 "Resugar" $ resugar Env.empty qtm
 -                 pure (Evaluated itm Nothing)
              _ =>
                do (ntm `WithType` ty) <- logTimeWhen !getEvalTiming 0 "Evaluation" $
@@ -191,10 +191,10 @@ index e85d7797a..2d06da3c8 100644
  export
  toList : HasIO io => IOArray a -> io (List (Maybe a))
 diff --git a/support/chez/support.ss b/support/chez/support.ss
-index ffb37d4ee..32f2ec1ad 100644
+index d6879a1a0..1f13c900d 100644
 --- a/support/chez/support.ss
 +++ b/support/chez/support.ss
-@@ -562,6 +562,13 @@
+@@ -558,6 +558,13 @@
  (define (blodwen-hasenv var)
    (if (eq? (getenv var) #f) 0 1))
  
